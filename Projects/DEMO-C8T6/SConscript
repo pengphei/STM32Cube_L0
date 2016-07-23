@@ -1,0 +1,102 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+import time
+Import('genv')
+
+genv["CFLAGS"] += [
+    "-DUSE_HAL_DRIVER",
+    "-DSTM32L051xx",
+]
+
+## root dependency
+
+# STM32L0xx_HAL libraries
+stm32_hal_script = '../../Drivers/STM32L0xx_HAL_Driver/SConscript'
+stm32_hal_library = SConscript(stm32_hal_script)
+
+# STM32L0xx_CMSIS libraries
+stm32_cmsis_script = '../../Drivers/CMSIS/Device/ST/STM32L0xx/SConscript'
+stm32_cmsis_library = SConscript(stm32_cmsis_script)
+
+## project building
+
+build_time = time.strftime("%H%M%S")
+build_date = time.strftime("%Y%m%d")
+build_date_time = time.strftime("%Y%m%d%H%M%S")
+
+startup_file = "startup_stm32l051xx.s"
+link_file = "STM32L051C8Tx_FLASH.ld"
+
+env = Environment()
+
+env["CC"] = genv["CC"]
+env["CXX"] = genv["CXX"]
+env["AS"] = genv["AS"]
+env["AR"] = genv["AR"]
+env["LINK"] = genv["LINK"]
+env["OBJCOPY"] = genv["OBJCOPY"]
+env["NM"] = genv["NM"]
+env["ENV"] = genv["ENV"]
+
+env["LINKFLAGS"] = genv["LINKFLAGS"]
+env["CFLAGS"] = genv["CFLAGS"]
+env["ASFLAGS"] = genv["ASFLAGS"]
+
+env["LINKFLAGS"] += [
+ 	"-TProjects/" + genv["PROJECT"] + "/" + link_file,
+]
+
+env["CFLAGS"] += [
+    "-DBUILD_TIME=\\\""+build_time+"\\\"",
+    "-DBUILD_DATE=\\\""+build_date+"\\\"",
+    "-DBUILD_DATE_TIME=\\\""+build_date_time+"\\\"",
+    "-Os",
+]
+
+env["LIBPATH"] = [
+    genv["PROJECT_OUT"],
+]
+
+inc = [
+    'Inc',
+    genv["STM32_DRIVERS_PATH"] + "/STM32L0xx_HAL_Driver/Inc",
+    genv["STM32_DRIVERS_PATH"] + "/STM32L0xx_HAL_Driver/Inc/Legacy",
+    genv["STM32_DRIVERS_PATH"] + "/CMSIS/Device/ST/STM32L0xx/Include",
+    genv["STM32_DRIVERS_PATH"] + "/CMSIS/Include",
+]
+
+dst_elf = "DEMO_L051_C876.elf"
+dst_bin = "DEMO_L051_C876.bin"
+dst_hex = "DEMO_L051_C876.hex"
+
+src = [startup_file]
+
+src += [
+    "Src/main.c",
+    "Src/stm32l0xx_hal_msp.c",
+    "Src/stm32l0xx_it.c",
+]
+
+lib = [ 
+    "gcc",
+    "c", 
+    "m", 
+    "rdimon", 
+    "STM32L0XX_HAL",
+    "STM32L0XX_CMSIS",
+]
+
+stm32_elf = env.Program(target=dst_elf, source=src, LIBS=lib, CPPPATH=inc)
+stm32_hex = env.Command(dst_hex, dst_elf, env["OBJCOPY"]+" -Oihex $SOURCE $TARGET")
+stm32_bin = env.Command(dst_bin, dst_elf, env["OBJCOPY"]+" -Obinary $SOURCE $TARGET")
+Return("stm32_hal_library", "stm32_cmsis_library", "stm32_elf", "stm32_hex", "stm32_bin")
